@@ -404,13 +404,13 @@ while run:
     if keys[pygame.K_PAGEDOWN]:
         data.add_x_tileset(vel)
 
-    if keys[pygame.K_KP0]:
+    if keys[pygame.K_KP0] or keys[pygame.K_0]:
         data.selected_tile_layer=0
-    if keys[pygame.K_KP1]:
+    if keys[pygame.K_KP1] or keys[pygame.K_2]:
         data.selected_tile_layer=1
-    if keys[pygame.K_KP2]:
+    if keys[pygame.K_KP2] or keys[pygame.K_3]:
         data.selected_tile_layer=2
-    if keys[pygame.K_KP3]:
+    if keys[pygame.K_KP3] or keys[pygame.K_4]:
         data.selected_tile_layer=3
     if key_released and keys[pygame.K_KP4] and data.selected_map_tile[1]>0:
         key_released=False
@@ -442,7 +442,7 @@ while run:
 
     if key_released and keys[pygame.K_DELETE]:
         key_released=False
-        data.remove_layer(True)
+        data.remove_layer(all=True)
         
     if key_released and (keys[pygame.K_KP_MINUS] or keys[pygame.K_MINUS]):
         key_released=False
