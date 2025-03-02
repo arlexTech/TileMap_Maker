@@ -6,6 +6,8 @@ import os
 
 #Parameters
 tilesets_folder = "pokemon_tilesets"
+adapt_to_screen=True
+#if False use the following parameters:
 ntiles_width=58 #width=ntiles_width*33 by default so 58*33=1914
 ntiles_height=32 #height=ntiles_height*33 by default so 32*33=1056
 
@@ -25,20 +27,31 @@ vel = 1
 
 space_between_tiles = 1 #1
 tile_size = 32 #32
-total_size1 = tile_size + space_between_tiles
-total_size2 = total_size1 + space_between_tiles
+tile_size_p1 = tile_size + space_between_tiles
+tile_size_p2 = tile_size_p1 + space_between_tiles
 
 ntiles_tileset_width=8
-ntiles_map_width=ntiles_width-ntiles_tileset_width
+tileset_width=tile_size_p1*ntiles_tileset_width
 
+if adapt_to_screen:
+    info = pygame.display.Info()  # Get display info
+    screen_height=max(info.current_h//4*3,(10)*tile_size_p1)
+    screen_width=max(info.current_w//4*3,(10+1+ntiles_tileset_width)*tile_size_p1)
 
-tileset_width=total_size1*ntiles_tileset_width
-map_width=total_size1*ntiles_map_width
+    ntiles_height=screen_height//tile_size_p1
+
+    ntiles_map_width=screen_width//tile_size_p1-ntiles_tileset_width
+    ntiles_width=ntiles_map_width+ntiles_tileset_width+1
+else:
+    ntiles_map_width=ntiles_width-ntiles_tileset_width
+
+map_width=tile_size_p1*ntiles_map_width
+
+height=ntiles_height*tile_size_p1
+width=map_width+tile_size_p1+tileset_width
+
 print("Map width:",map_width)
 print("Tileset width:",tileset_width)
-
-height=ntiles_height*total_size1
-width=map_width+tileset_width+total_size1
 print("Width:",width)
 
 win = pygame.display.set_mode((width,height),pygame.RESIZABLE)
@@ -372,6 +385,7 @@ mouse0_released=True
 mouse2_released=True
 move_coo=Coo()
 run = True
+previous_resize=pygame.time.get_ticks()
 while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -382,6 +396,9 @@ while run:
                 data.coo.y += event.x
             else:
                 data.add_x_tileset(-event.y)
+        elif event.type == pygame.VIDEORESIZE:  # Detect window resize
+            screen_height = event.h
+            screen_width = event.w
     
     win.fill((255,255,255))
     keys = pygame.key.get_pressed()
@@ -389,6 +406,18 @@ while run:
         key_released=True
     if keys[pygame.K_ESCAPE]:
         run=False
+    if keys[pygame.K_SPACE]:
+        ntiles_height=screen_height//tile_size_p1+1
+
+        ntiles_map_width=screen_width//tile_size_p1-ntiles_tileset_width-1
+        ntiles_width=ntiles_map_width+ntiles_tileset_width+1
+
+        map_width=tile_size_p1*ntiles_map_width
+
+        height=ntiles_height*tile_size_p1
+        width=ntiles_width*tile_size_p1
+        win=pygame.display.set_mode((width , height), pygame.RESIZABLE)
+        previous_resize=pygame.time.get_ticks()
     if keys[pygame.K_LEFT] or keys[move_keys[1]]:
         data.coo.y -= vel
     if keys[pygame.K_RIGHT]  or keys[move_keys[3]]:
@@ -460,7 +489,7 @@ while run:
 
             #Click on the map
             if pygame.mouse.get_pos()[0]<map_width:
-                overed_tile_pos=[pygame.mouse.get_pos()[1]//total_size1+data.coo.x,pygame.mouse.get_pos()[0]//total_size1+data.coo.y]
+                overed_tile_pos=[pygame.mouse.get_pos()[1]//tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//tile_size_p1+data.coo.y]
                 if keys[pygame.K_LCTRL]:
                     data.remove_layer(overed_tile_pos,all=True)
                 else:
@@ -468,27 +497,25 @@ while run:
                         data.selected_map_tile=overed_tile_pos
                     else:
                         data.map_set_tile()
-                #try:print("Selected tile: ",data.map[data.selected_map_tile[0]][data.selected_map_tile[1]])
-                #except:print("Selected tile: Out of bounds")
 
             #Click on a layer
-            elif pygame.mouse.get_pos()[1]<total_size1:
-                data.selected_tile_layer=pygame.mouse.get_pos()[0]//total_size1-ntiles_map_width-1
+            elif pygame.mouse.get_pos()[1]<tile_size_p1:
+                data.selected_tile_layer=pygame.mouse.get_pos()[0]//tile_size_p1-ntiles_map_width-1
 
             #Click on a button
-            elif pygame.mouse.get_pos()[1]<total_size1*2:
-                data.buttons[(pygame.mouse.get_pos()[0]//total_size1-ntiles_map_width-1)].lead(data)
+            elif pygame.mouse.get_pos()[1]<tile_size_p1*2:
+                data.buttons[(pygame.mouse.get_pos()[0]//tile_size_p1-ntiles_map_width-1)].lead(data)
             
             #Click on the tileset
             else:
-                if pygame.mouse.get_pos()[0]//total_size1-ntiles_map_width-1>=0 and pygame.mouse.get_pos()[1]>2*total_size1:
-                    overed_tile_pos=[pygame.mouse.get_pos()[1]//total_size1+data.x_tileset-2,pygame.mouse.get_pos()[0]//total_size1-ntiles_map_width-1]
+                if pygame.mouse.get_pos()[0]//tile_size_p1-ntiles_map_width-1>=0 and pygame.mouse.get_pos()[1]>2*tile_size_p1:
+                    overed_tile_pos=[pygame.mouse.get_pos()[1]//tile_size_p1+data.x_tileset-2,pygame.mouse.get_pos()[0]//tile_size_p1-ntiles_map_width-1]
                     if data.selected_tileset_tile!=overed_tile_pos:
                         data.selected_tileset_tile=overed_tile_pos
                     else:
                         data.map_set_tile(True)
         else:
-            move_coo.redef(mouse0_last_pos[1][0]-(pygame.mouse.get_pos()[1]-mouse0_last_pos[0][1])//total_size1,mouse0_last_pos[1][1]-(pygame.mouse.get_pos()[0]-mouse0_last_pos[0][0])//total_size1)
+            move_coo.redef(mouse0_last_pos[1][0]-(pygame.mouse.get_pos()[1]-mouse0_last_pos[0][1])//tile_size_p1,mouse0_last_pos[1][1]-(pygame.mouse.get_pos()[0]-mouse0_last_pos[0][0])//tile_size_p1)
 
     else:
         if not mouse0_released:
@@ -501,14 +528,14 @@ while run:
             mouse2_released=False
             #Click on the map
             if pygame.mouse.get_pos()[0]<map_width:
-                coo=[pygame.mouse.get_pos()[1]//total_size1+data.coo.x,pygame.mouse.get_pos()[0]//total_size1+data.coo.y]
+                coo=[pygame.mouse.get_pos()[1]//tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//tile_size_p1+data.coo.y]
                 if keys[pygame.K_LCTRL]:
                     data.remove_layer(coo)
                 else:
                     data.remove_layer(coo,all=True)
             #Click on a layer
-            elif pygame.mouse.get_pos()[1]<total_size1:
-                data.remove_layer(layer=pygame.mouse.get_pos()[0]//total_size1-ntiles_map_width-1)
+            elif pygame.mouse.get_pos()[1]<tile_size_p1:
+                data.remove_layer(layer=pygame.mouse.get_pos()[0]//tile_size_p1-ntiles_map_width-1)
     else:
         mouse2_released=True
     
@@ -517,27 +544,27 @@ while run:
 
     #Highlight selected map tile
     if 0<=data.selected_map_tile[0]-temp_x<ntiles_height and 0<=data.selected_map_tile[1]-temp_y<ntiles_map_width:
-        pygame.draw.rect(win,(0,0,0),((data.selected_map_tile[1]-temp_y)*total_size1-1,(data.selected_map_tile[0]-temp_x)*total_size1-1, total_size2, total_size2))
-        pygame.draw.rect(win,(255,255,255),((data.selected_map_tile[1]-temp_y)*total_size1,(data.selected_map_tile[0]-temp_x)*total_size1, tile_size, tile_size))
+        pygame.draw.rect(win,(0,0,0),((data.selected_map_tile[1]-temp_y)*tile_size_p1-1,(data.selected_map_tile[0]-temp_x)*tile_size_p1-1, tile_size_p2, tile_size_p2))
+        pygame.draw.rect(win,(255,255,255),((data.selected_map_tile[1]-temp_y)*tile_size_p1,(data.selected_map_tile[0]-temp_x)*tile_size_p1, tile_size, tile_size))
         
     #Highlight selected layer tile
-    pygame.draw.rect(win,(0,0,0),((data.selected_tile_layer+ntiles_map_width+1)*total_size1-1,0, total_size2, total_size1))
-    pygame.draw.rect(win,(255,255,255),((data.selected_tile_layer+ntiles_map_width+1)*total_size1,0, tile_size, tile_size))
+    pygame.draw.rect(win,(0,0,0),((data.selected_tile_layer+ntiles_map_width+1)*tile_size_p1-1,0, tile_size_p2, tile_size_p1))
+    pygame.draw.rect(win,(255,255,255),((data.selected_tile_layer+ntiles_map_width+1)*tile_size_p1,0, tile_size, tile_size))
     
     #Highlight selected tileset tile
     if 0<=data.selected_tileset_tile[0]-data.x_tileset<ntiles_height:
-        pygame.draw.rect(win,(0,0,0),((data.selected_tileset_tile[1]+ntiles_map_width+1)*total_size1-1,(data.selected_tileset_tile[0]-data.x_tileset+2)*total_size1-1, total_size2, total_size2))
-        pygame.draw.rect(win,(255,255,255),((data.selected_tileset_tile[1]+ntiles_map_width+1)*total_size1,(data.selected_tileset_tile[0]-data.x_tileset+2)*total_size1, tile_size, tile_size))
+        pygame.draw.rect(win,(0,0,0),((data.selected_tileset_tile[1]+ntiles_map_width+1)*tile_size_p1-1,(data.selected_tileset_tile[0]-data.x_tileset+2)*tile_size_p1-1, tile_size_p2, tile_size_p2))
+        pygame.draw.rect(win,(255,255,255),((data.selected_tileset_tile[1]+ntiles_map_width+1)*tile_size_p1,(data.selected_tileset_tile[0]-data.x_tileset+2)*tile_size_p1, tile_size, tile_size))
 
     #Display selected map tile coordinates
-    win.blit(bestfont.render(str(data.selected_map_tile), 1, (0,0,0)), (ntiles_map_width*total_size1-3, 8))
+    win.blit(bestfont.render(str(data.selected_map_tile), 1, (0,0,0)), (ntiles_map_width*tile_size_p1-3, 8))
 
     #Display the displayed tileset's index
     tileset_index_display.fill((index_bg_color))
     text_surface = font.render(str(data.tileset_index), True, index_color)
     text_rect = text_surface.get_rect(center=(tile_size // 2, tile_size // 2))
     tileset_index_display.blit(text_surface, text_rect)
-    win.blit(tileset_index_display, (ntiles_map_width*total_size1, total_size1))
+    win.blit(tileset_index_display, (ntiles_map_width*tile_size_p1, tile_size_p1))
 
 
     #Display map
@@ -545,12 +572,12 @@ while run:
         for j in range(ntiles_map_width):
             if 0<=temp_x+i<len(data.map) and 0<=temp_y+j<len(data.map[temp_x+i]):
                 for k in range(0,len(data.map[temp_x+i][temp_y+j])):
-                    win.blit(tilesets[data.map[temp_x+i][temp_y+j][k][2]], (j*total_size1, i*total_size1),(data.map[temp_x+i][temp_y+j][k][1]*tile_size,data.map[temp_x+i][temp_y+j][k][0]*tile_size,tile_size,tile_size))
+                    win.blit(tilesets[data.map[temp_x+i][temp_y+j][k][2]], (j*tile_size_p1, i*tile_size_p1),(data.map[temp_x+i][temp_y+j][k][1]*tile_size,data.map[temp_x+i][temp_y+j][k][0]*tile_size,tile_size,tile_size))
             else:
-                win.blit(hatched_tile, (j * total_size1, i * total_size1))
+                win.blit(hatched_tile, (j * tile_size_p1, i * tile_size_p1))
             if i==0:
-                win.blit(bestfont.render(str(j+temp_y), 1, (0,0,0)), (j*total_size1+10, 0))
-        win.blit(bestfont.render(str(i+temp_x), 1, (0,0,0)), (0, i*total_size1+10))
+                win.blit(bestfont.render(str(j+temp_y), 1, (0,0,0)), (j*tile_size_p1+10, 0))
+        win.blit(bestfont.render(str(i+temp_x), 1, (0,0,0)), (0, i*tile_size_p1+10))
     
     #Display tileset
     for j in range(2,ntiles_height):
@@ -559,16 +586,16 @@ while run:
                 ts=[tilesets[t[0]],t[1]]
                 break
         for i in range(ntiles_map_width+1,ntiles_map_width+1+ntiles_tileset_width):
-            win.blit(ts[0], (i*total_size1, j*total_size1),((i-ntiles_map_width-1)*tile_size,(data.x_tileset+j-2-ts[1])*tile_size,tile_size,tile_size))
+            win.blit(ts[0], (i*tile_size_p1, j*tile_size_p1),((i-ntiles_map_width-1)*tile_size,(data.x_tileset+j-2-ts[1])*tile_size,tile_size,tile_size))
 
     #Display selected tile layers
     if 0<=data.selected_map_tile[0]<len(data.map) and 0<=data.selected_map_tile[1]<len(data.map[data.selected_map_tile[0]]):
         for i in range(len(data.map[data.selected_map_tile[0]][data.selected_map_tile[1]])):
-            win.blit(tilesets[data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][2]], ((ntiles_map_width+i+1)*total_size1, 0),((data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][1])*tile_size,(data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][0])*tile_size,tile_size,tile_size))
+            win.blit(tilesets[data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][2]], ((ntiles_map_width+i+1)*tile_size_p1, 0),((data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][1])*tile_size,(data.map[data.selected_map_tile[0]][data.selected_map_tile[1]][i][0])*tile_size,tile_size,tile_size))
     
     #Display buttons
     for i in range(8):
-        win.blit(data.buttons[i].surface, ((ntiles_map_width+1+i)*total_size1, total_size1),(0,0,tile_size,tile_size))
+        win.blit(data.buttons[i].surface, ((ntiles_map_width+1+i)*tile_size_p1, tile_size_p1),(0,0,tile_size,tile_size))
     
     pygame.display.update()
     data.save_map()
