@@ -36,11 +36,11 @@ class Game:
 
         if adapt_to_screen:
             info = pygame.display.Info()  # Get display info
-            screen_height=max(info.current_h//4*3,(10)*self.tile_size_p1)
-            screen_width=max(info.current_w//4*3,(10+1+self.ntiles_tileset_width)*self.tile_size_p1)
-            self.exact_height=screen_height
-            self.exact_width=screen_width
-            self.resize_window((screen_width,screen_height),True)
+            win_height=max(info.current_h//4*3,(10)*self.tile_size_p1)
+            win_width=max(info.current_w//4*3,(10+1+self.ntiles_tileset_width)*self.tile_size_p1)
+            self.win_height=win_height
+            self.win_width=win_width
+            self.resize_window((win_width,win_height))
         else:
             self.ntiles_height=ntiles_height
             self.ntiles_width=ntiles_width
@@ -50,31 +50,25 @@ class Game:
 
             self.width = self.map_width+self.tile_size_p1+self.tileset_width
             self.height = self.ntiles_height*self.tile_size_p1
-            self.exact_height=screen_height=self.height
-            self.exact_width=screen_width=self.width
-            self.win = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+            self.win_height=win_height=self.height
+            self.win_width=win_width=self.width
+        self.win = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
         
         self.update_hached_tile()
         self.tileset_index_display=pygame.Surface((self.tile_size, self.tile_size), pygame.SRCALPHA)
 
-    def resize_window(self, dims=False, changed=False):
+    def resize_window(self, dims=None):
         if dims:
-            win_width, win_height = dims
-        else:
-            win_width, win_height = self.exact_width, self.exact_height
+            self.win_width, self.win_height = win_width, win_height = dims
         
-        self.ntiles_height=win_height//self.tile_size_p1+1
-        self.ntiles_map_width=win_width//self.tile_size_p1-self.ntiles_tileset_width-1
+        self.ntiles_height=self.win_height//self.tile_size_p1+1
+        self.ntiles_map_width=self.win_width//self.tile_size_p1-self.ntiles_tileset_width-1
         self.ntiles_width=self.ntiles_map_width+self.ntiles_tileset_width+1
 
         self.map_width=self.tile_size_p1*self.ntiles_map_width
 
         self.height=self.ntiles_height*self.tile_size_p1
         self.width=self.ntiles_width*self.tile_size_p1
-        if changed:
-            self.exact_height=self.height
-            self.exact_width=self.width
-            self.win=pygame.display.set_mode((self.exact_width , self.exact_height), pygame.RESIZABLE)
 
     def update_hached_tile(self):
         self.hatched_tile = pygame.Surface((self.tile_size, self.tile_size), pygame.SRCALPHA)
@@ -86,17 +80,17 @@ class Game:
         for offset in range(-self.tile_size, self.tile_size, step):
             pygame.draw.line(self.hatched_tile, line_color, (offset, 0), (offset + self.tile_size, self.tile_size), 1)
     
-    def update_sizes(self,dims=False,changed=False):
+    def update_sizes(self,dims=None):
         self.tile_size_p1 = self.tile_size + self.space_between_tiles
         self.tile_size_p2 = self.tile_size_p1 + self.space_between_tiles
-        self.resize_window(dims,changed)
+        self.resize_window(dims)
         self.font=pygame.font.SysFont("monospace", self.tile_size//3)
         self.update_hached_tile()
 
     def resize_tile_add(self,x):
         if 0<self.tile_size+x*5<100:
             self.tile_size+=x*5
-            self.update_sizes()
+            #self.update_sizes()
         
     def resize_tile_default(self):
         self.tile_size=self.default_tile_size
@@ -210,18 +204,25 @@ class Coo:
     def __init__(self,x=0,y=0):
         self.x=x
         self.y=y
-    
-    def redef(self,x,y):
-        self.x=x
-        self.y=y
 
-    def redef_from_list(self,c):
-        self.x=c[0]
-        self.y=c[1]
+    def redef(self,c,y=False):
+        if type(c)==type(self):
+            self.x=c.x
+            self.y=c.y
+        elif type(c)==type([]):
+            self.x=c[0]
+            self.y=c[1]
+        elif y and type(c)==type(0):
+            self.x=c
+            self.y=y
 
-    def redef_from_coo(self,o):
-        self.x=o.x
-        self.y=o.y
+    def add(self,c):
+        if type(c)==type(self):
+            self.x+=c.x
+            self.y+=c.y
+        else:
+            self.x+=c[0]
+            self.y+=c[1]
     
     def get(self):
         return [self.x,self.y]
@@ -429,8 +430,8 @@ class Data:
         pygame.image.save(map_surface, "map.png")
         print("Map exported")
 
-    def update_sizes(self,dims=False,changed=False):
-        self.game.update_sizes(dims,changed)
+    def update_sizes(self,dims=False):
+        self.game.update_sizes(dims)
         for b in self.buttons:
             b.update_size(self.game.tile_size)
 
@@ -459,21 +460,22 @@ while run:
         if event.type == pygame.QUIT:
             run = False
         elif event.type == pygame.MOUSEWHEEL:  # Detect scrolling
-            if pygame.mouse.get_pos()[0]<data.game.map_width:
-                if keys[pygame.K_LCTRL]:
-                    data.resize_tile_add(event.y)
-                else:
-                    data.coo.x -= event.y
-                    data.coo.y += event.x
+            if keys[pygame.K_LCTRL]:
+                overed_tile_pos=[pygame.mouse.get_pos()[1]//data.game.tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//data.game.tile_size_p1+data.coo.y]
+                data.resize_tile_add(event.y)
+                new_overed_tile_pos=[pygame.mouse.get_pos()[1]//data.game.tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//data.game.tile_size_p1+data.coo.y]
+                data.coo.add([overed_tile_pos[i] - new_overed_tile_pos[i] for i in range(len(overed_tile_pos))])
+            elif pygame.mouse.get_pos()[0]<data.game.map_width:
+                data.coo.x -= event.y
+                data.coo.y += event.x
             else:
                 data.add_x_tileset(-event.y)
         elif event.type == pygame.VIDEORESIZE:  # Detect window resize
             win_dimensions = event.w,event.h
+            data.update_sizes(win_dimensions)
 
     if keys[pygame.K_ESCAPE]:
         run=False
-    if keys[pygame.K_SPACE]:
-        data.update_sizes(win_dimensions,True)
     if keys[pygame.K_LEFT] or keys[move_keys[1]]:
         data.coo.y -= data.game.vel
     if keys[pygame.K_RIGHT]  or keys[move_keys[3]]:
@@ -732,5 +734,4 @@ while run:
     
     pygame.display.update()
     data.save_map()
-    time.sleep(0.01)
 pygame.quit()
