@@ -43,9 +43,6 @@
 - **Ctrl + Right click on a tile** → Delete it
 - **Right click on a layer** → Delete it   
 
-### Debbug
-- **Space** → Reload to adapt to new window size
-
 ## Installation & Usage  
 Clone the repository and run the tool:  
 ```sh
