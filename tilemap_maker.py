@@ -241,12 +241,12 @@ class Data:
         self.load_map(temp_map)
 
         # Get all PNG files in the folder
-        png_files = sorted([f for f in os.listdir(tilesets_folder) if f.endswith(".PNG")])
+        png_files = sorted([f for f in os.listdir(tilesets_folder) if f.endswith(".png")])
         self.sets = []
         self.tilesets = {}
 
         for png in png_files:
-            name = os.path.splitext(png)[0]  # Remove .PNG extension
+            name = os.path.splitext(png)[0]  # Remove .png extension
             image = pygame.image.load(os.path.join(tilesets_folder, png)).convert_alpha()
             
             # Get the height in tiles
