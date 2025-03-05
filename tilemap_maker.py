@@ -1,8 +1,7 @@
 import pygame
-import time
 import json
 import os
-
+import datetime
 
 #Parameters (all optionnal)
 tilesets_folder = "pokemon_tilesets" #Optionnal default is "tilesets"
@@ -16,6 +15,10 @@ move_keys=[
                 pygame.K_z,
     pygame.K_q, pygame.K_s,  pygame.K_d
 ]
+
+map_saves_folder="map_saves/"
+temp_map=".temp.json"
+map_exports_folder="map_exports/"
 
 pygame.init()
 pygame.display.set_caption("Map Editor")
@@ -90,7 +93,6 @@ class Game:
     def resize_tile_add(self,x):
         if 0<self.tile_size+x*5<100:
             self.tile_size+=x*5
-            #self.update_sizes()
         
     def resize_tile_default(self):
         self.tile_size=self.default_tile_size
@@ -205,14 +207,14 @@ class Coo:
         self.x=x
         self.y=y
 
-    def redef(self,c,y=False):
+    def redef(self,c,y=None):
         if type(c)==type(self):
             self.x=c.x
             self.y=c.y
         elif type(c)==type([]):
             self.x=c[0]
             self.y=c[1]
-        elif y and type(c)==type(0):
+        elif y!=None and type(c)==type(0):
             self.x=c
             self.y=y
 
@@ -236,7 +238,7 @@ class Data:
         self.selected_tileset_tile = selected_tileset_tile
         self.x_tileset = x_tileset
         self.tileset_index = 0
-        self.load_map()
+        self.load_map(temp_map)
 
         # Get all PNG files in the folder
         png_files = sorted([f for f in os.listdir(tilesets_folder) if f.endswith(".PNG")])
@@ -269,7 +271,17 @@ class Data:
         self.buttons.append(Button(pygame.Surface((self.game.tile_size, self.game.tile_size), pygame.SRCALPHA), 0, button_type="down_arrow"))
         self.buttons.append(Button(pygame.Surface((self.game.tile_size, self.game.tile_size), pygame.SRCALPHA), -1, button_type="double_down_arrow"))
 
-    def load_map(self,filename="temp.json"):
+    def load_map(self,map=False):
+        if not map:
+            files = [f for f in os.listdir(map_saves_folder) if f.startswith("map_") and f.endswith(".json")]
+            print(files)
+            if files:
+                filename = map_saves_folder+max(files, key=lambda x: int(x.split("_")[-1].split(".")[0]))
+            else:
+                filename = "map_saves/.temp.json"
+        else:
+            filename=map_saves_folder+map
+
         if not os.path.exists(filename):
             print(f"{filename} not found. Creating a new one...")
             with open(filename, "w") as f:
@@ -277,9 +289,29 @@ class Data:
         with open(filename,"r") as f:
             self.map=json.loads(f.read())
 
-    def save_map(self,filename="temp.json"):
+    def save_map(self,map=False):
+        if not map:
+            filename = map_saves_folder+f"map_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        else:
+            filename=map_saves_folder+map
+            
         with open(filename,"w+") as f:
             f.write(json.dumps(self.map))
+        
+        if map!=temp_map:
+            print(f"Map saved as {map_saves_folder}{filename}")
+
+    def export_map(self):
+        print("Exporting map")
+        map_surface = pygame.Surface((len(self.map[0])*self.game.default_tile_size,len(self.map)*self.game.default_tile_size), pygame.SRCALPHA)
+        for i in range(len(self.map)):
+            for j in range(len(self.map[i])):
+                for k in range(len(self.map[i][j])):
+                    if self.map[i][j][k][2] != "":
+                        map_surface.blit(self.tilesets[self.map[i][j][k][2]], (j*self.game.default_tile_size, i*self.game.default_tile_size),(self.map[i][j][k][1]*self.game.default_tile_size,self.map[i][j][k][0]*self.game.default_tile_size,self.game.default_tile_size,self.game.default_tile_size))
+        name=f"map_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        pygame.image.save(map_surface, map_exports_folder+name)
+        print("Map exported as",name)
 
     def reduce_map(self):
         shrink=True
@@ -369,18 +401,27 @@ class Data:
             if self.selected_tileset_tile[0]<t[2]:
                 return [self.selected_tileset_tile[0]-t[1],self.selected_tileset_tile[1],t[0]]
         
-    def map_set_tile(self,use_layer=False):
+    def map_set_tile(self,use_layer=False,custom_tile=False,replace=False):
         self.map_is_large_enough()
-        if use_layer:
-            layer=len(self.map[self.selected_map_tile[0]][self.selected_map_tile[1]])
+        if custom_tile:
+            if replace:
+                self.map[self.selected_map_tile[0]][self.selected_map_tile[1]]=custom_tile
+            else:
+                for t in custom_tile:
+                    self.map[self.selected_map_tile[0]][self.selected_map_tile[1]].append(t)
         else:
-            layer=self.selected_tile_layer
-        if self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][0]==self.default[0]:
-            del self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][0]
-        if len(self.map[self.selected_map_tile[0]][self.selected_map_tile[1]])>layer:
-            self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][layer]=self.wich_tile()
-        else:
-            self.map[self.selected_map_tile[0]][self.selected_map_tile[1]].append(self.wich_tile())
+            if use_layer:
+                layer=self.selected_tile_layer
+            else:
+                layer=len(self.map[self.selected_map_tile[0]][self.selected_map_tile[1]])
+
+            if self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][0]==self.default[0]:
+                del self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][0]
+                
+            if len(self.map[self.selected_map_tile[0]][self.selected_map_tile[1]])>layer:
+                self.map[self.selected_map_tile[0]][self.selected_map_tile[1]][layer]=self.wich_tile()
+            else:
+                self.map[self.selected_map_tile[0]][self.selected_map_tile[1]].append(self.wich_tile())
         self.reduce_map()
 
     def update_buttons(self):
@@ -419,16 +460,6 @@ class Data:
         if 0<=self.x_tileset+x:
             self.x_tileset+=x
             self.update_buttons()
-        
-    def export_map(self):
-        print("Exporting map")
-        map_surface = pygame.Surface((len(self.map[0])*self.game.default_tile_size,len(self.map)*self.game.default_tile_size), pygame.SRCALPHA)
-        for i in range(len(self.map)):
-            for j in range(len(self.map[i])):
-                for k in range(len(self.map[i][j])):
-                    map_surface.blit(self.tilesets[self.map[i][j][k][2]], (j*self.game.default_tile_size, i*self.game.default_tile_size),(self.map[i][j][k][1]*self.game.default_tile_size,self.map[i][j][k][0]*self.game.default_tile_size,self.game.default_tile_size,self.game.default_tile_size))
-        pygame.image.save(map_surface, "map.png")
-        print("Map exported")
 
     def update_sizes(self,dims=False):
         self.game.update_sizes(dims)
@@ -443,18 +474,71 @@ class Data:
 data=Data(Game(ntiles_height=ntiles_height,ntiles_width=ntiles_width),tilesets_folder=tilesets_folder)
 data.update_buttons()
 
-mouse0_last_pos=(pygame.mouse.get_pos(),data.coo.get(),data.coo.get())
+move_coo=Coo()
+mouse0_last_pos=(pygame.mouse.get_pos(),move_coo.get())
 key_released=True
+
+pressed_keys = []
+def first_press(key):
+    cm=key not in pressed_keys and keys[key]
+    if cm:
+        pressed_keys.append(key)
+    return cm
+
+if not os.path.exists(map_saves_folder):
+    os.makedirs(map_saves_folder)
 mouse0_released=True
 mouse2_released=True
-move_coo=Coo()
+mouse_on_map=False
 run = True
+clipboard=data.default
 win_dimensions=data.game.get_size()
+
+
+def file_selection_menu(screen):
+    BG_COLOR = (30, 30, 30)
+    TEXT_COLOR = (255, 255, 255)
+    HIGHLIGHT_COLOR = (100, 100, 255)
+    font = pygame.font.Font(None, 36)
+    fsm = True
+    selected_index = None
+    files = [f for f in os.listdir(map_saves_folder) if f.endswith(".json")]
+    while fsm:
+        screen.fill(BG_COLOR)
+        y_offset = 50
+
+        for i, file in enumerate(files):
+            color = HIGHLIGHT_COLOR if i == selected_index else TEXT_COLOR
+            text_surface = font.render(file, True, color)
+            screen.blit(text_surface, (50, y_offset))
+            y_offset += 40
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None  # User closed the window
+
+            if event.type == pygame.MOUSEMOTION:
+                # Highlight file under mouse cursor
+                mx, my = event.pos
+                selected_index = (my - 50) // 40 if 50 <= my <= 50 + len(files) * 40 else None
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+                if selected_index is not None and 0 <= selected_index < len(files):
+                    return files[selected_index]
+
+
 while run:
     data.game.win.fill((255,255,255))
     keys = pygame.key.get_pressed()
     if all(not key for key in keys):
         key_released=True
+    
+    for i in range(len(pressed_keys)):
+        if not keys[pressed_keys[i]]:
+            del pressed_keys[i]
+            break
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -466,10 +550,12 @@ while run:
                 new_overed_tile_pos=[pygame.mouse.get_pos()[1]//data.game.tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//data.game.tile_size_p1+data.coo.y]
                 data.coo.add([overed_tile_pos[i] - new_overed_tile_pos[i] for i in range(len(overed_tile_pos))])
             elif pygame.mouse.get_pos()[0]<data.game.map_width:
-                data.coo.x -= event.y
-                data.coo.y += event.x
+                data.coo.add([-event.y,event.x])
             else:
-                data.add_x_tileset(-event.y)
+                if keys[pygame.K_LSHIFT]:
+                    data.add_x_tileset(-event.y*5)
+                else:
+                    data.add_x_tileset(-event.y)
         elif event.type == pygame.VIDEORESIZE:  # Detect window resize
             win_dimensions = event.w,event.h
             data.update_sizes(win_dimensions)
@@ -483,8 +569,6 @@ while run:
     if keys[pygame.K_UP] or keys[move_keys[0]]:
         data.coo.x -= data.game.vel
     if keys[pygame.K_DOWN] or (keys[move_keys[2]] and not keys[pygame.K_LCTRL]):
-        if keys[pygame.K_LCTRL]:
-            key_released=False
         data.coo.x += data.game.vel
     if keys[pygame.K_PAGEUP] and data.x_tileset>0:
         data.add_x_tileset(-data.game.vel)
@@ -493,48 +577,57 @@ while run:
 
     if keys[pygame.K_KP0] or keys[pygame.K_0]:
         data.selected_tile_layer=0
-    if keys[pygame.K_KP1] or keys[pygame.K_2]:
+    if keys[pygame.K_KP1] or keys[pygame.K_1]:
         data.selected_tile_layer=1
-    if keys[pygame.K_KP2] or keys[pygame.K_3]:
+    if keys[pygame.K_KP2] or keys[pygame.K_2]:
         data.selected_tile_layer=2
-    if keys[pygame.K_KP3] or keys[pygame.K_4]:
+    if keys[pygame.K_KP3] or keys[pygame.K_3]:
         data.selected_tile_layer=3
-    if key_released and keys[pygame.K_KP4] and data.selected_map_tile[1]>0:
-        key_released=False
+    
+    if first_press(pygame.K_KP4):
         data.selected_map_tile[1]-=1
-    if key_released and keys[pygame.K_KP5]:
-        key_released=False
+    if first_press(pygame.K_KP5):
         data.selected_map_tile[0]+=1
-    if key_released and keys[pygame.K_KP6]:
-        key_released=False
+    if first_press(pygame.K_KP6):
         data.selected_map_tile[1]+=1
-    if key_released and keys[pygame.K_KP8] and data.selected_map_tile[0]>0:
-        key_released=False
+    if first_press(pygame.K_KP8):
         data.selected_map_tile[0]-=1
 
-    if key_released and keys[pygame.K_r]:
-        key_released=False
+    if first_press(pygame.K_r):
         data.reduce_map()
     
-    if key_released and keys[pygame.K_LCTRL] and keys[pygame.K_s]:
-        key_released=False
-        data.save_map("map.json")
+    if first_press(pygame.K_s) and keys[pygame.K_LCTRL]:
+        if keys[pygame.K_LSHIFT]:
+            data.save_map(input("Enter the name of the file to save (without .json): ")+".json")
+        else:
+            data.save_map()
     
-    if key_released and keys[pygame.K_o]:
-        key_released=False
-        data.load_map("map.json")
+    if first_press(pygame.K_o):
+        if keys[pygame.K_LCTRL]:
+            data.load_map(file_selection_menu(data.game.win))#input("Enter the name of the file to open (without .json): ")+".json")
+        else:
+            data.load_map()
 
-    if key_released and keys[pygame.K_DELETE]:
-        key_released=False
+    if first_press(pygame.K_DELETE):
         data.remove_layer(all=True)
         
-    if key_released and (keys[pygame.K_KP_MINUS] or keys[pygame.K_MINUS]):
-        key_released=False
+    if first_press(pygame.K_KP_MINUS) or first_press(pygame.K_MINUS):
         data.remove_layer()
 
-    if key_released and keys[pygame.K_e]:
-        key_released=False
+    if first_press(pygame.K_e):
         data.export_map()
+
+    if first_press(pygame.K_c) and keys[pygame.K_LCTRL]:
+        clipboard=data.map[data.selected_map_tile[0]][data.selected_map_tile[1]].copy()
+
+    if first_press(pygame.K_v) and keys[pygame.K_LCTRL]:
+        if keys[pygame.K_LSHIFT]:
+            data.map_set_tile(custom_tile=clipboard,replace=True)
+        else:
+            data.map_set_tile(custom_tile=clipboard)
+    
+    if first_press(pygame.K_p):
+        print(data.map[data.selected_map_tile[0]][data.selected_map_tile[1]])
         
     ############################################################################################################
     #                                           Left click                                                     #
@@ -542,10 +635,11 @@ while run:
     if pygame.mouse.get_pressed()[0]==1:
         if mouse0_released:
             mouse0_released=False
-            mouse0_last_pos=(pygame.mouse.get_pos(),move_coo.get(),data.coo.get())
+            mouse0_last_pos=(pygame.mouse.get_pos(),move_coo.get())
 
             #Click on the map
             if pygame.mouse.get_pos()[0]<data.game.map_width:
+                mouse_on_map=True
                 overed_tile_pos=[pygame.mouse.get_pos()[1]//data.game.tile_size_p1+data.coo.x,pygame.mouse.get_pos()[0]//data.game.tile_size_p1+data.coo.y]
                 if keys[pygame.K_LCTRL]:
                     data.remove_layer(overed_tile_pos,all=True)
@@ -572,10 +666,12 @@ while run:
                     else:
                         data.map_set_tile()
         else:
-            move_coo.redef(mouse0_last_pos[1][0]-(pygame.mouse.get_pos()[1]-mouse0_last_pos[0][1])//data.game.tile_size_p1,mouse0_last_pos[1][1]-(pygame.mouse.get_pos()[0]-mouse0_last_pos[0][0])//data.game.tile_size_p1)
-
+            if mouse_on_map:
+                move_coo.redef(mouse0_last_pos[1][0]-(pygame.mouse.get_pos()[1]-mouse0_last_pos[0][1])//data.game.tile_size_p1,mouse0_last_pos[1][1]-(pygame.mouse.get_pos()[0]-mouse0_last_pos[0][0])//data.game.tile_size_p1)
+ 
     else:
         if not mouse0_released:
+            mouse_on_map=False
             data.coo.redef(data.coo.x+move_coo.x,data.coo.y+move_coo.y)
             move_coo.redef(0,0)
         mouse0_released=True
@@ -601,7 +697,7 @@ while run:
             else:
                 if pygame.mouse.get_pos()[0]//data.game.tile_size_p1-data.game.ntiles_map_width-1>=0 and pygame.mouse.get_pos()[1]>2*data.game.tile_size_p1:
                     data.selected_tileset_tile=[pygame.mouse.get_pos()[1]//data.game.tile_size_p1+data.x_tileset-2,pygame.mouse.get_pos()[0]//data.game.tile_size_p1-data.game.ntiles_map_width-1]
-                    data.map_set_tile(True)
+                    data.map_set_tile(False)
     else:
         mouse2_released=True
     
@@ -733,5 +829,5 @@ while run:
         )
     
     pygame.display.update()
-    data.save_map()
+    data.save_map(temp_map)
 pygame.quit()
